@@ -325,13 +325,37 @@ def get_world_cities():
 
 @st.cache_data(show_spinner=False)
 def get_exchange_rate(from_currency, to_currency):
-    if from_currency == to_currency: return 1.0
-    try:
-        url  = f"https://api.frankfurter.dev/v1/latest?base={from_currency}&symbols={to_currency}"
-        resp = requests.get(url, timeout=5)
-        return resp.json()["rates"][to_currency]
-    except:
+    if from_currency == to_currency:
         return 1.0
+
+    # Frankfurter supports only these 31 ECB currencies
+    FRANKFURTER_SUPPORTED = {
+        "AUD","BGN","BRL","CAD","CHF","CNY","CZK","DKK","EUR","GBP",
+        "HKD","HUF","IDR","ILS","INR","ISK","JPY","KRW","MXN","MYR",
+        "NOK","NZD","PHP","PLN","RON","SEK","SGD","THB","TRY","USD","ZAR"
+    }
+
+    # Route 1 — Frankfurter (ECB data) for supported currencies
+    if from_currency in FRANKFURTER_SUPPORTED and to_currency in FRANKFURTER_SUPPORTED:
+        try:
+            url  = f"https://api.frankfurter.dev/v1/latest?base={from_currency}&symbols={to_currency}"
+            resp = requests.get(url, timeout=5)
+            return resp.json()["rates"][to_currency]
+        except:
+            pass
+
+    # Route 2 — Open Exchange Rates public endpoint for unsupported currencies
+    # (PKR, BDT, AED, SAR etc.)
+    try:
+        url  = f"https://open.er-api.com/v6/latest/{from_currency}"
+        resp = requests.get(url, timeout=5)
+        data = resp.json()
+        if data.get("result") == "success":
+            return data["rates"][to_currency]
+    except:
+        pass
+
+    return 1.0  # last resort fallback
 
 @st.cache_data(show_spinner=False)
 def get_city_costs(city_name):
